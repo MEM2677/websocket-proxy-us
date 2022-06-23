@@ -1,12 +1,15 @@
-package com.entando.lapam.proxy.authproxy.keycloack;
+package com.entando.lapam.proxy.authproxy.keycloack.impl;
 
 
 import com.entando.lapam.proxy.authproxy.domain.keycloak.AuthenticationFlow;
 import com.entando.lapam.proxy.authproxy.domain.keycloak.Execution;
 import com.entando.lapam.proxy.authproxy.domain.keycloak.IdentityProvider;
 import com.entando.lapam.proxy.authproxy.domain.keycloak.Profile;
+import com.entando.lapam.proxy.authproxy.domain.keycloak.RealmPublicKey;
 import com.entando.lapam.proxy.authproxy.domain.keycloak.Token;
-import com.entando.lapam.proxy.authproxy.dto.ConnectionInfo;
+import com.entando.lapam.proxy.authproxy.dto.KeycloakClient;
+import com.entando.lapam.proxy.authproxy.keycloack.Constants;
+import com.entando.lapam.proxy.authproxy.keycloack.KeycloakClientService;
 import com.entando.lapam.proxy.authproxy.util.KeycloakUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,34 +24,59 @@ import org.springframework.web.util.UriUtils;
 import reactor.core.publisher.Mono;
 
 import javax.annotation.PostConstruct;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Arrays;
 import java.util.Optional;
+import java.util.Set;
 
 
 @Component
-public class KeycloakClient {
+public class KeycloakClientServiceImpl implements KeycloakClientService {
 
-    private final Logger logger = LoggerFactory.getLogger(KeycloakClient.class);
+    private final Logger logger = LoggerFactory.getLogger(KeycloakClientServiceImpl.class);
 
     @PostConstruct
     private void setup() {
-        KeycloakUtils.setup(this, null);
+        KeycloakClient keycloakClient = new KeycloakClient("https://forumpa.apps.psdemo.eng-entando.com");
+
+
+        try {
+            // save public key of the realm to a file
+            RealmPublicKey realmPublicKey = getRealmPublicKey(keycloakClient.getHost());
+            String pem = "-----BEGIN PUBLIC KEY-----" + realmPublicKey.getPublicKey() + "-----END PUBLIC KEY-----";
+            Set<PosixFilePermission> access =
+              PosixFilePermissions.fromString("rw-rw-rw-");
+            Path certFile =
+              Files.createTempFile("keycloakPublicKey", ".pem", PosixFilePermissions.asFileAttribute(access));
+            try (FileOutputStream fout = new FileOutputStream(certFile.toFile())) {
+                fout.write(pem.getBytes(StandardCharsets.UTF_8));
+                logger.debug("Keycloak public key saved in " + certFile.toAbsolutePath());
+            } catch (Throwable t) {
+                logger.error("Error saving public key", t);
+                throw t;
+            }
+            // setup helper class
+            KeycloakUtils.setup(this, keycloakClient, certFile.toAbsolutePath().toString());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
-    /**
-     *
-     * @param connection
-     * @return
-     */
-    public Token getAdminToken(ConnectionInfo connection) {
+    public Token getAdminToken(KeycloakClient keycloakClient) {
         Token token = null;
         WebClient client = WebClient.create();
         MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
-        final String REST_URI = connection.getHost() + "/auth/realms/master/protocol/openid-connect/token";
+        final String REST_URI = keycloakClient.getHost() + "/auth/realms/master/protocol/openid-connect/token";
 
-        body.add("username", connection.getUsername());
-        body.add("password", connection.getPassword());
+        body.add("username", keycloakClient.getUsername());
+        body.add("password", keycloakClient.getPassword());
         body.add("grant_type", "password");
         body.add("client_id", "admin-cli");
         body.add("client_secret", "admin-cli");
@@ -81,12 +109,6 @@ public class KeycloakClient {
         return token;
     }
 
-    /**
-     *
-     * @param host
-     * @param token
-     * @return
-     */
     protected boolean duplicateAuthFlow(String host, Token token) {
         final String REST_URI = encodePath(
             host + "/auth/admin/realms/" + Constants.KEYCLOAK_DEFAULT_REALM + "/authentication/flows/" + Constants.KEYCLOAK_DEFAULT_AUTH_FLOW + "/copy"
@@ -119,12 +141,6 @@ public class KeycloakClient {
         return created;
     }
 
-    /**
-     *
-     * @param host
-     * @param token
-     * @return
-     */
     protected boolean addExecutable(String host, Token token) {
         final String REST_URI = encodePath(host + "/auth/admin/realms/" + Constants.KEYCLOAK_DEFAULT_REALM + "/authentication/flows/" + Constants.KEYCLOAK_EXECUTION_HANDLE_EXISTING_ACCOUNT_NAME + "/executions/execution");
         WebClient client = WebClient.create();
@@ -155,12 +171,6 @@ public class KeycloakClient {
         return created;
     }
 
-    /**
-     *
-     * @param host
-     * @param token
-     * @return
-     */
     protected Execution[] getExecutions(String host, Token token) {
         Execution[] executions = null;
         final String REST_URI = encodePath(
@@ -190,13 +200,6 @@ public class KeycloakClient {
         return executions;
     }
 
-    /**
-     *
-     * @param host
-     * @param token
-     * @param id
-     * @return
-     */
     protected boolean raiseExecutionPriority(String host, Token token, String id) {
         final String REST_URI = encodePath(
             host + "/auth/admin/realms/" + Constants.KEYCLOAK_DEFAULT_REALM + "/authentication/executions/" + id + "/raise-priority"
@@ -226,15 +229,6 @@ public class KeycloakClient {
         return success;
     }
 
-    /**
-     *
-     * @param host
-     * @param token
-     * @param executions
-     * @param executionName
-     * @param requirement
-     * @return
-     */
     protected boolean updateExecutionRequirement(String host, Token token, Execution[] executions, String executionName, String requirement) {
         AuthenticationFlow updated = null;
         Optional<Execution> execOpt = findExecution(executions, executionName);
@@ -249,13 +243,6 @@ public class KeycloakClient {
         return updated != null;
     }
 
-    /**
-     *
-     * @param host
-     * @param token
-     * @param execution
-     * @return
-     */
     protected AuthenticationFlow updateExecution(String host, Token token, Execution execution) {
         final String REST_URI = encodePath(
             host + "/auth/admin/realms/" + Constants.KEYCLOAK_DEFAULT_REALM + "/authentication/flows/" + Constants.KEYCLOAK_NEW_AUTH_FLOW_NAME + "/executions"
@@ -288,13 +275,7 @@ public class KeycloakClient {
         return flow;
     }
 
-    /**
-     *
-     * @param host
-     * @param token
-     * @param idp
-     * @return
-     */
+
     protected boolean createIdentityProvider(String host, Token token, IdentityProvider idp) {
         final String REST_URI = encodePath(host + "/auth/admin/realms/" + Constants.KEYCLOAK_DEFAULT_REALM + "/identity-provider/instances");
         WebClient client = WebClient.create();
@@ -324,12 +305,7 @@ public class KeycloakClient {
         return created;
     }
 
-    /**
-     *
-     * @param host
-     * @param token
-     * @return
-     */
+
     protected boolean addMapperUsername(String host, Token token) {
         return addMapperElement(host, token, USERNAME_MAPPER_CFG);
     }
@@ -342,13 +318,7 @@ public class KeycloakClient {
         return addMapperElement(host, token, payload);
     }
 
-    /**
-     *
-     * @param host
-     * @param token
-     * @param payload
-     * @return
-     */
+
     private boolean addMapperElement(String host, Token token, String payload) {
         final String REST_URI = encodePath(
             host + "/auth/admin/realms/" + Constants.KEYCLOAK_DEFAULT_REALM + "/identity-provider/instances/" + Constants.KEYCLOAK_IDP_ALIAS + "/mappers"
@@ -381,14 +351,8 @@ public class KeycloakClient {
         return created;
     }
 
-    /**
-     *
-     * @param host
-     * @param token
-     * @param id
-     * @return
-     */
-    public Profile getUser(String host, Token token, String id) {
+
+    public Profile getUserProfile(String host, Token token, String id) {
         Profile[] profiles = null;
         final String REST_URI = encodePath(host + "/auth/admin/realms/" + Constants.KEYCLOAK_DEFAULT_REALM + "/users") + "?briefRepresentation=false&first=0&max=20&search=" + id;
         WebClient client = WebClient.create();
@@ -420,6 +384,33 @@ public class KeycloakClient {
         }
     }
 
+    @Override
+    public RealmPublicKey getRealmPublicKey(String host) {
+        RealmPublicKey realmKey = null;
+        final String REST_URI = encodePath(host + "/auth/realms/" + Constants.KEYCLOAK_DEFAULT_REALM);
+        WebClient client = WebClient.create();
+
+        try {
+            realmKey = client
+              .get()
+              .uri(new URI(REST_URI))
+              .accept(MediaType.APPLICATION_JSON)
+              .exchangeToMono(result -> {
+                  if (result.statusCode()
+                    .equals(HttpStatus.OK)) {
+                      return result.bodyToMono(RealmPublicKey.class);
+                  } else {
+                      logger.error("Unexpected status: {}" , result.statusCode());
+                      return Mono.empty();
+                  }
+              })
+              .block();
+        } catch (Throwable t) {
+            logger.error("error in getExecutions", t);
+        }
+        return realmKey;
+    }
+
     /**
      *
      * @param executions
@@ -441,7 +432,7 @@ public class KeycloakClient {
     }
 
     // templates for mappers
-    private static String USERNAME_MAPPER_CFG =
+    private static final String USERNAME_MAPPER_CFG =
         "{\n" +
             "   \"identityProviderAlias\":\"" +
             Constants.KEYCLOAK_IDP_ALIAS +
@@ -454,7 +445,7 @@ public class KeycloakClient {
             "   \"identityProviderMapper\":\"spid-saml-username-idp-mapper\"\n" +
             "}";
 
-    private static String ATTRIBUTE_MAPPER_CFG =
+    private static final String ATTRIBUTE_MAPPER_CFG =
         "{\n" +
             "   \"identityProviderAlias\":\"" +
             Constants.KEYCLOAK_IDP_ALIAS +

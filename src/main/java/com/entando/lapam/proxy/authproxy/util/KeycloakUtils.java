@@ -1,14 +1,17 @@
 package com.entando.lapam.proxy.authproxy.util;
 
-import com.entando.lapam.proxy.authproxy.keycloack.KeycloakClient;
-import com.entando.lapam.proxy.authproxy.dto.ConnectionInfo;
+import com.entando.lapam.proxy.authproxy.domain.keycloak.Profile;
+import com.entando.lapam.proxy.authproxy.domain.keycloak.Token;
+import com.entando.lapam.proxy.authproxy.dto.KeycloakClient;
+import com.entando.lapam.proxy.authproxy.keycloack.impl.KeycloakClientServiceImpl;
 
 public class KeycloakUtils {
 
   private static KeycloakUtils instance;
 
-  private KeycloakClient client;
-  private ConnectionInfo conn;
+  private KeycloakClientServiceImpl keycloakService;
+  private KeycloakClient keycloakClient;
+  private String publicKeyPath;
 
   private KeycloakUtils() { }
 
@@ -19,32 +22,62 @@ public class KeycloakUtils {
     return instance;
   }
 
-  public static KeycloakClient getCLient() {
-    return getInstance().getClient();
+  public static KeycloakClientServiceImpl getService() {
+    return getInstance().getKeycloakService();
   }
 
-  public static ConnectionInfo getConnectionInfo() {
-    return getInstance().getConn();
+  public static KeycloakClient getClient() {
+    return getInstance().getKeycloakClient();
   }
 
-  public static void setup(KeycloakClient client, ConnectionInfo info) {
-    getInstance().setClient(client);
-    getInstance().setConn(info);
+  public static String getPKPath() {
+    return getInstance().getPublicKeyPath();
   }
 
-  public KeycloakClient getClient() {
-    return client;
+  public static void setup(KeycloakClientServiceImpl client, KeycloakClient info, String path) {
+    getInstance().setKeycloakService(client);
+    getInstance().setKeycloakClient(info);
+    getInstance().setPublicKeyPath(path);
   }
 
-  public void setClient(KeycloakClient client) {
-    this.client = client;
+  public KeycloakClientServiceImpl getKeycloakService() {
+    return keycloakService;
   }
 
-  public ConnectionInfo getConn() {
-    return conn;
+  public void setKeycloakService(KeycloakClientServiceImpl keycloakService) {
+    this.keycloakService = keycloakService;
   }
 
-  public void setConn(ConnectionInfo conn) {
-    this.conn = conn;
+  public KeycloakClient getKeycloakClient() {
+    return keycloakClient;
   }
+
+  public void setKeycloakClient(KeycloakClient keycloakClient) {
+    this.keycloakClient = keycloakClient;
+  }
+
+  public static Token getAdminToken() {
+    KeycloakClientServiceImpl service = getInstance().getKeycloakService();
+    KeycloakClient client = getInstance().getKeycloakClient();
+
+    return service.getAdminToken(client);
+  }
+
+  public static Profile getUserProfile(String username) {
+    KeycloakClientServiceImpl service = getInstance().getKeycloakService();
+    KeycloakClient client = getInstance().getKeycloakClient();
+
+    Token token = getAdminToken();
+    return service.getUserProfile(client.getHost(), token, username);
+  }
+
+  public String getPublicKeyPath() {
+    return publicKeyPath;
+  }
+
+  public void setPublicKeyPath(String publicKeyPath) {
+    this.publicKeyPath = publicKeyPath;
+  }
+
+
 }

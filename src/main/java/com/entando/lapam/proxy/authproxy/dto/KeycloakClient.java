@@ -1,19 +1,17 @@
 package com.entando.lapam.proxy.authproxy.dto;
 
-public class ConnectionInfo {
+public class KeycloakClient {
 
     private String username;
     private String password;
     private String host;
 
-    public ConnectionInfo(String host) {
+    public KeycloakClient(String host) {
         this.host = host;
     }
 
     public void setLogin(String username, String password) {
         try {
-//      this.password = new String(Base64.getDecoder().decode(password));
-//      this.username = new String(Base64.getDecoder().decode(username));
             this.password = password;
             this.username = username;
         } catch (Throwable e) {
