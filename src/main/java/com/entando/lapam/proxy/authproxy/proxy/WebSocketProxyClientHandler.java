@@ -1,4 +1,4 @@
-package com.entando.lapam.proxy.authproxy;
+package com.entando.lapam.proxy.authproxy.proxy;
 
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.WebSocketMessage;
@@ -14,7 +14,7 @@ public class WebSocketProxyClientHandler extends AbstractWebSocketHandler {
   }
 
   @Override
-  public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+  public void afterConnectionEstablished(WebSocketSession session) {
     System.out.println("-- SERVER REMOTO CONNESSIONE APERTA (" + session.getId() + ") --");
   }
 
@@ -23,7 +23,7 @@ public class WebSocketProxyClientHandler extends AbstractWebSocketHandler {
     webSocketServerSession.sendMessage(message);
   }
 
-  public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
+  public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
     System.out.println("-- SERVER REMOTO CONNESSIONE CHIUSA (" + status.getCode() + ") --");
   }
 

@@ -1,4 +1,4 @@
-package com.entando.lapam.proxy.authproxy;
+package com.entando.lapam.proxy.authproxy.proxy;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,6 +64,6 @@ public class RemoteWebsocketServerHandler {
     webSocketClientSession.close();
   }
 
-//  public static final String REMOTE_URL = "wss://ws.postman-echo.com/raw";
-  public static final String REMOTE_URL = "ws://34.159.252.151:61500/wish.tcl?cHJvZ3JhbSByZXBvcnQvYmlsYW5jaW9QZXJpb2RpY28gYXJncyB7ICAtdXRlbnRlIDExNzUxMyAtcHJvZyAxIH0=";
+  public static final String REMOTE_URL = "wss://ws.postman-echo.com/raw";
+//  public static final String REMOTE_URL = "ws://34.159.252.151:61500/wish.tcl?cHJvZ3JhbSByZXBvcnQvYmlsYW5jaW9QZXJpb2RpY28gYXJncyB7ICAtdXRlbnRlIDExNzUxMyAtcHJvZyAxIH0=";
 }

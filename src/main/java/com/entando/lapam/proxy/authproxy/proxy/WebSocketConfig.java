@@ -1,4 +1,4 @@
-package com.entando.lapam.proxy.authproxy;
+package com.entando.lapam.proxy.authproxy.proxy;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
