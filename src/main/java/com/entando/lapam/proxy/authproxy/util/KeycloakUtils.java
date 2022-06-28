@@ -63,13 +63,6 @@ public class KeycloakUtils {
     return service.getAdminToken(client);
   }
 
-  public static Profile getUserProfile(String username) {
-    KeycloakClientServiceImpl service = getInstance().getKeycloakService();
-    KeycloakClient client = getInstance().getKeycloakClient();
-
-    Token token = getAdminToken();
-    return service.getUserProfile(client.getHost(), token, username);
-  }
 
   public String getPublicKeyPath() {
     return publicKeyPath;

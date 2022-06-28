@@ -51,4 +51,15 @@ public class Metopack {
   public void setProg(String prog) {
     this.prog = prog;
   }
+
+  @Override
+  public String toString() {
+    StringBuilder mods = new StringBuilder();
+
+    for (int i = 0; modules != null && i < modules.length; i++) {
+      mods.append(modules[i]);
+      mods.append(" ");
+    }
+    return "[ connection: " + connection + " prog: " + prog + " utente: " + utente + " modules: {" + mods + "}]";
+  }
 }

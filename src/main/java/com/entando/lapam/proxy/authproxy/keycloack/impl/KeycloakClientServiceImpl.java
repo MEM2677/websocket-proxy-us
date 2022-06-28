@@ -45,7 +45,8 @@ public class KeycloakClientServiceImpl implements KeycloakClientService {
     @PostConstruct
     private void setup() {
         KeycloakClient keycloakClient = new KeycloakClient("https://forumpa.apps.psdemo.eng-entando.com");
-
+        keycloakClient.setPassword("");
+        keycloakClient.setUsername("");
 
         try {
             // save public key of the realm to a file
@@ -57,7 +58,8 @@ public class KeycloakClientServiceImpl implements KeycloakClientService {
               Files.createTempFile("keycloakPublicKey", ".pem", PosixFilePermissions.asFileAttribute(access));
             try (FileOutputStream fout = new FileOutputStream(certFile.toFile())) {
                 fout.write(pem.getBytes(StandardCharsets.UTF_8));
-                logger.debug("Keycloak public key saved in " + certFile.toAbsolutePath());
+                System.out.println("Keycloak public key saved in " + certFile.toAbsolutePath());
+                logger.info("Keycloak public key saved in " + certFile.toAbsolutePath());
             } catch (Throwable t) {
                 logger.error("Error saving public key", t);
                 throw t;
@@ -179,7 +181,7 @@ public class KeycloakClientServiceImpl implements KeycloakClientService {
         WebClient client = WebClient.create();
 
         try {
-            executions = (Execution[]) client
+            executions = client
                     .get()
                     .uri(new URI(REST_URI))
                     .header("Authorization", "Bearer " + token.getAccessToken())
@@ -418,9 +420,7 @@ public class KeycloakClientServiceImpl implements KeycloakClientService {
      * @return
      */
     protected Optional<Execution> findExecution(Execution[] executions, String displayName) {
-        return Arrays
-            .asList(executions)
-            .stream()
+        return Arrays.stream(executions)
             //      .peek(e -> System.out.println(">?> " + e.getDisplayName()))
             .filter(e -> e.getDisplayName().equals(displayName))
             .findFirst();

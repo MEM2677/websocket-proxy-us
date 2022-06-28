@@ -14,13 +14,15 @@ import java.util.concurrent.TimeUnit;
 
 public class RemoteWebsocketServerHandler {
 
-  private final WebSocketSession webSocketClientSession;
-  private final Logger logger = LoggerFactory.getLogger(this.getClass());
+  private final Logger logger = LoggerFactory.getLogger(RemoteWebsocketServerHandler.class);
 
-  public RemoteWebsocketServerHandler(WebSocketSession webSocketClientSession) {
-    this.webSocketClientSession = open(webSocketClientSession);
+  private final WebSocketSession session;
+  private final String uri;
+
+  public RemoteWebsocketServerHandler(WebSocketSession session, String uri) {
+    this.uri = uri;
+    this.session = open(session);
   }
-
 
   private WebSocketHttpHeaders getWebSocketHttpHeaders(final WebSocketSession userAgentSession) {
     WebSocketHttpHeaders headers = new WebSocketHttpHeaders();
@@ -43,27 +45,32 @@ public class RemoteWebsocketServerHandler {
     return headers;
   }
 
-  protected WebSocketSession open(WebSocketSession webSocketServerSession) {
+  protected WebSocketSession open(WebSocketSession session) {
     try {
-      System.out.println("-- RICHIESTA APERTURA CONNESSIONE REMOTA --");
-      WebSocketHttpHeaders headers = getWebSocketHttpHeaders(webSocketServerSession);
+      System.out.println("-- RICHIESTA APERTURA CONNESSIONE REMOTA A: " + uri + " --");
+
+      WebSocketHttpHeaders headers = getWebSocketHttpHeaders(session);
       return new StandardWebSocketClient()
-        .doHandshake(new WebSocketProxyClientHandler(webSocketServerSession), headers, new URI(REMOTE_URL))
+        .doHandshake(new WebSocketProxyClientHandler(session), headers, new URI(uri))
         .get(3000, TimeUnit.MILLISECONDS);
-    } catch (Exception e) {
+    } catch (Throwable e) {
       throw new RuntimeException(e);
     }
   }
 
+  public boolean isOpen() {
+    return session.isOpen();
+  }
+
   public void forwardMessage(WebSocketMessage<?> webSocketMessage) throws IOException {
-    webSocketClientSession.sendMessage(webSocketMessage);
+    session.sendMessage(webSocketMessage);
   }
 
   public void close() throws IOException {
     System.out.println("-- RICHIESTA CHIUSURA CONNESSIONE REMOTA --");
-    webSocketClientSession.close();
+    session.close();
   }
 
-  public static final String REMOTE_URL = "wss://ws.postman-echo.com/raw";
-//  public static final String REMOTE_URL = "ws://34.159.252.151:61500/wish.tcl?cHJvZ3JhbSByZXBvcnQvYmlsYW5jaW9QZXJpb2RpY28gYXJncyB7ICAtdXRlbnRlIDExNzUxMyAtcHJvZyAxIH0=";
+//  public static final String REMOTE_URL = "wss://ws.postman-echo.com/raw";
+
 }

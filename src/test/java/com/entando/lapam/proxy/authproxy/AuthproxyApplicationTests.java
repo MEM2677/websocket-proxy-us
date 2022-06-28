@@ -3,6 +3,8 @@ package com.entando.lapam.proxy.authproxy;
 import com.entando.lapam.proxy.authproxy.domain.Metopack;
 import com.entando.lapam.proxy.authproxy.domain.keycloak.Profile;
 import com.entando.lapam.proxy.authproxy.util.JWTUtils;
+import com.entando.lapam.proxy.authproxy.util.LapamUtils;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.fusionauth.jwt.Verifier;
 import io.fusionauth.jwt.domain.JWT;
@@ -117,11 +119,11 @@ class AuthproxyApplicationTests {
 
 	@Test
 	public void testDecodeJWT() throws Throwable {
-		Metopack data = JWTUtils.getLapamProperties(TEST_JWT);
+		Metopack data = LapamUtils.getLapamProperties(TEST_JWT);
 		assertNotNull(data);
 		assertEquals("1", data.getProg());
 
-		data = JWTUtils.getLapamProperties(null);
+		data = LapamUtils.getLapamProperties(null);
 		assertNull(data);
 	}
 
@@ -132,7 +134,49 @@ class AuthproxyApplicationTests {
 		assertEquals("matteo", user);
 	}
 
+	@Test
+	public void generateLapamRequest() {
+		String request = LapamUtils.encodeLapamRequest("report/bilancioPeriodico", "117513", "1");
+		assertNotNull(request);
+		assertEquals("cHJvZ3JhbSByZXBvcnQvYmlsYW5jaW9QZXJpb2RpY28gYXJncyB7ICAtdXRlbnRlIDExNzUxMyAtcHJvZyAxIH0=",
+			request);
+	}
+
+	@Test
+	public void testLapamRquest() {
+		final String MODULO = "report/bilancioPeriodico";
+		Metopack data = new Metopack();
+
+		String[] moduli = {MODULO};
+		data.setModules(moduli);
+		assertTrue(LapamUtils.checkModule(MODULO, data));
+		assertFalse(LapamUtils.checkModule(MODULO.toLowerCase(), data));
+		assertFalse(LapamUtils.checkModule(MODULO, null));
+		assertFalse(LapamUtils.checkModule(null, data));
+		data.setModules(null);
+		assertFalse(LapamUtils.checkModule(MODULO, data));
+	}
+
+	@Test
+	public void testLapamUri() throws JsonProcessingException {
+		ObjectMapper objectMapper = new ObjectMapper();
+		final String modulo = "report/budgetOnline";
+
+		try {
+			Metopack info = objectMapper.readValue(LAPAM, Metopack.class);
+			String uri = LapamUtils.generateLapamURI(modulo, info);
+			assertTrue(StringUtils.isNotBlank(uri));
+			assertEquals("ws://33.155.255.155:61500/wish.tcl?cHJvZ3JhbSByZXBvcnQvYnVkZ2V0T25saW5lIGFyZ3MgeyAgLXV0ZW50ZSAxMTIyMzMgLXByb2cgMSB9",
+				uri);
+		} catch (Throwable t) {
+			t.printStackTrace();
+			throw t;
+		}
+	}
+
 	public static String TEST_JWT = "eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICJWRm4yaklVTmotaVdNYnN2WEpadGdWX2psU2dsNlFmX1ZmSHJMYko0R2NzIn0.eyJleHAiOjE2NTU5OTA3NzYsImlhdCI6MTY1NTk5MDQ3NiwiYXV0aF90aW1lIjoxNjU1OTg4MjgyLCJqdGkiOiJlNmI0YzAyYS1hNzM3LTQ1NGEtODhkYy1hM2QyMjU4NGZhZDkiLCJpc3MiOiJodHRwczovL2ZvcnVtcGEuYXBwcy5wc2RlbW8uZW5nLWVudGFuZG8uY29tL2F1dGgvcmVhbG1zL2VudGFuZG8iLCJhdWQiOiJhY2NvdW50Iiwic3ViIjoiYjIxOTYyNzctOTMzMi00ZTYzLWIxNGUtMWQzZTI5NDdmY2EzIiwidHlwIjoiQmVhcmVyIiwiYXpwIjoiZW50YW5kby13ZWIiLCJub25jZSI6IjVlNDE2MTVhLThlMDgtNDM2Ni04N2U1LWQzM2UwZmZkMDBhZSIsInNlc3Npb25fc3RhdGUiOiI0N2U0OTcwNS1kODE5LTQzNTUtOTViNy01NWMwMjZmMTVlZTMiLCJhY3IiOiIwIiwiYWxsb3dlZC1vcmlnaW5zIjpbImh0dHBzOi8vZm9ydW1wYS5hcHBzLnBzZGVtby5lbmctZW50YW5kby5jb20iXSwicmVhbG1fYWNjZXNzIjp7InJvbGVzIjpbIm9mZmxpbmVfYWNjZXNzIiwidW1hX2F1dGhvcml6YXRpb24iLCJkZWZhdWx0LXJvbGVzLWVudGFuZG8iXX0sInJlc291cmNlX2FjY2VzcyI6eyJhY2NvdW50Ijp7InJvbGVzIjpbIm1hbmFnZS1hY2NvdW50IiwibWFuYWdlLWFjY291bnQtbGlua3MiLCJ2aWV3LXByb2ZpbGUiXX19LCJzY29wZSI6Im9wZW5pZCBwcm9maWxlIGVtYWlsIiwic2lkIjoiNDdlNDk3MDUtZDgxOS00MzU1LTk1YjctNTVjMDI2ZjE1ZWUzIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsIm5hbWUiOiJNYXR0ZW8gTWlubmFpIiwibGFwYW0iOnsibWV0b3BhY2tjbG91ZCI6eyJjb25uZWN0aW9uIjoiMzQuMTU5LjI1Mi4xNTE6NjE1MDAiLCJtb2R1bGVzIjpbInJlcG9ydC9iaWxhbmNpb1BlcmlvZGljbyJdLCJ1dGVudGUiOiIxMTc1MTMiLCJwcm9nIjoiMSJ9fSwicHJlZmVycmVkX3VzZXJuYW1lIjoibWF0dGVvIiwiZ2l2ZW5fbmFtZSI6Ik1hdHRlbyIsImZhbWlseV9uYW1lIjoiTWlubmFpIiwiZW1haWwiOiJtLm1pbm5haUBlbnRhbmRvLmNvbSJ9.PAG_VVqIAwh-RAZEhI2pIRdhmx0D3ajpz5QoHpPgEtcL1McL_WjuV3Uw-ZY01wG-ePS_BBKAYDvK4OVqY1jBQZHwevge9PZ9qvCNLgsp36wqvov8r9tlNBvWQsD2tzaC3jC7Hh0z2aLORihTq3o5at6h9xxPF5C8TB7VosE4DV__veRQvOhDFTDZuR4Uakw8SXtXNjUxssib3nl0O7Lw3t32qwpHPZgKRV1PzDWHg30zrm82zWtMAgYj2tKfAJPe3_zetMouu-N5bTelSl-SobYh6p4tbVjR7YR5EYVxyXxvwFg4N4l8mZTRKsN69_bvAhotYmUmcbFynlWFF-0lEg";
+
+	public static final String REMOTE_URL = "ws://34.159.252.151:61500/wish.tcl?cHJvZ3JhbSByZXBvcnQvYmlsYW5jaW9QZXJpb2RpY28gYXJncyB7ICAtdXRlbnRlIDExNzUxMyAtcHJvZyAxIH0=";
 
 	public static String LAPAM = "{\n" +
 		"  \"connection\": \"33.155.255.155:61500\",\n" +
